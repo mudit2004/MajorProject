@@ -75,8 +75,8 @@ transform_train = Compose([
     HorizontalFlip(p=0.5),
     RandomBrightnessContrast(p=0.8, contrast_limit=(-0.3, 0.2)),
     Lambda(image=sample_normalize),
-    ToTensorV2(),
-    Lambda(image=randomErase)
+    Lambda(image=randomErase),       # ✅ Move this BEFORE ToTensorV2
+    ToTensorV2()
 ])
 
 transform_val = Compose([
@@ -114,6 +114,7 @@ class BAATrainDataset(Dataset):
         row = self.df.iloc[index]
         num = int(row['id'])
         image = transform_train(image=read_image(f"{self.file_path}/{num}.png"))['image']
+        print("Image shape:", image.shape)  # Expect: torch.Size([3, 512, 512])
         return (image, Tensor([row['male']])), row['zscore']
 
     def __len__(self):
@@ -420,16 +421,19 @@ if __name__ == "__main__":
 
     # Visual check of sample images
     import matplotlib.pyplot as plt
+    from IPython.display import display
 
     sample_dataset = BAATrainDataset(train_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset")
 
     for i in range(3):  # Show 3 sample images
         (image_tensor, gender_tensor), label = sample_dataset[i]
         image_np = image_tensor.permute(1, 2, 0).numpy()  # Convert tensor to HWC
-        plt.imshow(image_np.astype('uint8'))  # Ensure proper dtype
+        plt.figure(figsize=(4, 4))
+        plt.imshow(image_np.astype('uint8'))
         plt.title(f"Bone Age: {label:.2f}, Gender: {'Male' if gender_tensor.item() == 1 else 'Female'}")
         plt.axis('off')
-        plt.show()
+        display(plt.gcf())  # Show in Colab
+        plt.close()
     
     train_set, val_set, test_set = create_data_loader(
         train_df,
