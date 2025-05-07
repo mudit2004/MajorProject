@@ -231,18 +231,17 @@ def train_fn(net, train_loader, loss_fn, epoch, optimizer, device):
 
 def evaluate_fn(net, val_loader, device):
     net.fine_tune(False)
-    global mae_loss
-    global val_total_size
-
     mae_loss = 0.0
     val_total_size = 0.0
 
     with torch.no_grad():
         for batch_idx, data in enumerate(val_loader):
-            val_total_size += len(data[1])
             image, gender = data[0]
-            image, gender = image.to(device), gender.to(device)
-            label = data[1].to(device)
+            label = data[1]
+            batch_size = label.size(0)
+
+            val_total_size += batch_size
+            image, gender, label = image.to(device), gender.to(device), label.to(device)
 
             _, _, _, y_pred = net(image, gender)
             y_pred = (y_pred * boneage_div + boneage_mean).squeeze()
@@ -250,23 +249,22 @@ def evaluate_fn(net, val_loader, device):
             batch_loss = F.l1_loss(y_pred, label, reduction='sum').item()
             mae_loss += batch_loss
 
-    return mae_loss
+    return mae_loss / val_total_size if val_total_size > 0 else float('nan')
 
 
 def test_fn(net, test_loader, device):
     net.train(False)
-    global test_mae_loss
-    global test_total_size
-
     test_mae_loss = 0.0
     test_total_size = 0.0
 
     with torch.no_grad():
         for batch_idx, data in enumerate(test_loader):
-            test_total_size += len(data[1])
             image, gender = data[0]
-            image, gender = image.to(device), gender.to(device)
-            label = data[1].to(device)
+            label = data[1]
+            batch_size = label.size(0)
+
+            test_total_size += batch_size
+            image, gender, label = image.to(device), gender.to(device), label.to(device)
 
             _, _, _, y_pred = net(image, gender)
             y_pred = (y_pred * boneage_div + boneage_mean).squeeze()
@@ -274,7 +272,7 @@ def test_fn(net, test_loader, device):
             batch_loss = F.l1_loss(y_pred, label, reduction='sum').item()
             test_mae_loss += batch_loss
 
-    return test_mae_loss
+    return test_mae_loss / test_total_size if test_total_size > 0 else float('nan')
 
 def reduce_fn(vals):
     return sum(vals)
@@ -289,7 +287,6 @@ def map_fn(index, flags):
     seed_everything(seed=flags['seed'])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     mymodel = BAA_New(32, *get_My_resnet50()).to(device)
 
     # Dataloaders
@@ -308,40 +305,23 @@ def map_fn(index, flags):
 
     # Training Loop
     for epoch in range(flags['num_epochs']):
-        # Reset epoch metrics
-        global training_loss, total_size, mae_loss, val_total_size, test_mae_loss, test_total_size
-        training_loss = 0.0
-        total_size = 0.0
-        mae_loss = 0.0
-        val_total_size = 0.0
-        test_mae_loss = 0.0
-        test_total_size = 0.0
-
         start_time = time.time()
 
-        train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
-        evaluate_fn(net, val_loader, device)
-        test_fn(net, test_loader, device)
+        train_loss = train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
+        val_mae = evaluate_fn(net, val_loader, device)
+        test_mae = test_fn(net, test_loader, device)
 
         scheduler.step()
         torch.save(net.state_dict(), os.path.join(path, f'{model_name}.bin'))
-
-        # Compute metrics
-        train_loss = training_loss / total_size
-        val_mae = mae_loss / val_total_size
-        test_mae = test_mae_loss / test_total_size
-        epoch_time = time.time() - start_time
-        lr = optimizer.param_groups[0]["lr"]
 
         # Logging
         print(f"\n📊 Epoch {epoch + 1} Summary:")
         print(f"   🔹 Train Loss:     {train_loss:.4f}")
         print(f"   🔹 Val MAE:        {val_mae:.4f}")
         print(f"   🔹 Test MAE:       {test_mae:.4f}")
-        print(f"   ⏱️  Duration:       {epoch_time:.2f} sec")
-        print(f"   🚀 Learning Rate:  {lr:.6f}\n")
+        print(f"   ⏱️  Duration:       {time.time() - start_time:.2f} sec")
+        print(f"   🚀 Learning Rate:  {optimizer.param_groups[0]['lr']:.6f}\n")
 
-        # Save best
         if best_loss >= test_mae:
             best_loss = test_mae
             shutil.copy(f'{path}/{model_name}.bin', f'{path}/best_{model_name}.bin')
@@ -353,15 +333,14 @@ def map_ensemble_fn(index, flags):
     os.makedirs(path, exist_ok=True)
 
     seed_everything(seed=flags['seed'])
-
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Make sure new_model is defined properly
+    # Model
     base_model = BAA_New(32, *get_My_resnet50()).to(device)
     new_model = Graph_BAA(base_model).to(device)
     net = Ensemble(new_model).to(device)
 
-    # DataLoaders
+    # Dataloaders
     train_loader = DataLoader(train_set, batch_size=flags['batch_size'], shuffle=True,
                               num_workers=flags['num_workers'], drop_last=True)
     val_loader = DataLoader(val_set, batch_size=flags['batch_size'], shuffle=False,
@@ -373,36 +352,32 @@ def map_ensemble_fn(index, flags):
     best_loss = float('inf')
 
     loss_fn = nn.L1Loss(reduction='sum')
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()),
-                                 lr=flags['lr'], weight_decay=0)
+    optimizer = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, net.parameters()),
+        lr=flags['lr'], weight_decay=0
+    )
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     for epoch in range(flags['num_epochs']):
-        training_loss = 0.0
-        total_size = 0.0
-        mae_loss = 0.0
-        val_total_size = 0.0
-        test_mae_loss = 0.0
-        test_total_size = 0.0
-
         start_time = time.time()
 
-        train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
-        evaluate_fn(net, val_loader, device)
-        test_fn(net, test_loader, device)
+        # Collect average loss from functions
+        train_loss = train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
+        val_mae = evaluate_fn(net, val_loader, device)
+        test_mae = test_fn(net, test_loader, device)
 
         scheduler.step()
-
         torch.save(net.state_dict(), os.path.join(path, f'{model_name}.bin'))
 
-        train_loss = training_loss / total_size
-        val_mae = mae_loss / val_total_size
-        test_mae = test_mae_loss / test_total_size
+        # Logs
+        print(f"\n📊 Epoch {epoch + 1} Summary:")
+        print(f"   🔹 Train Loss:     {train_loss:.4f}")
+        print(f"   🔹 Val MAE:        {val_mae:.4f}")
+        print(f"   🔹 Test MAE:       {test_mae:.4f}")
+        print(f"   ⏱️  Duration:       {time.time() - start_time:.2f} sec")
+        print(f"   🚀 Learning Rate:  {optimizer.param_groups[0]['lr']:.6f}")
 
-        print(f'Test size: {test_total_size}')
-        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, '
-              f'time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
-
+        # Save best model
         if best_loss >= test_mae:
             best_loss = test_mae
             shutil.copy(f'{path}/{model_name}.bin', f'{path}/best_{model_name}.bin')
