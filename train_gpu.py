@@ -94,7 +94,7 @@ def read_image(path, image_size=512):
     w, h = img.size
     long = max(w, h)
     w, h = int(w / long * image_size), int(h / long * image_size)
-    img = img.resize((w, h), Image.ANTIALIAS)
+    img = img.resize((w, h), Image.Resampling.LANCZOS)
     delta_w, delta_h = image_size - w, image_size - h
     padding = (delta_w // 2, delta_h // 2, delta_w - (delta_w // 2), delta_h - (delta_h // 2))
     return np.array(ImageOps.expand(img, padding).convert("RGB"))
@@ -414,6 +414,19 @@ if __name__ == "__main__":
     train_df = filter_existing_images(train_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset")
     val_df = filter_existing_images(val_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
     test_df = filter_existing_images(test_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
+    
+    # Visual check of sample images
+    import matplotlib.pyplot as plt
+
+    sample_dataset = BAATrainDataset(train_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset")
+
+    for i in range(3):  # Show 3 sample images
+        (image_tensor, gender_tensor), label = sample_dataset[i]
+        image_np = image_tensor.permute(1, 2, 0).numpy()  # Convert tensor to HWC
+        plt.imshow(image_np.astype('uint8'))  # Ensure proper dtype
+        plt.title(f"Bone Age: {label:.2f}, Gender: {'Male' if gender_tensor.item() == 1 else 'Female'}")
+        plt.axis('off')
+        plt.show()
     
     boneage_mean = train_df['boneage'].mean()
     boneage_div = train_df['boneage'].std()
