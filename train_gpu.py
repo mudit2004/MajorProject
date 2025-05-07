@@ -195,6 +195,9 @@ def train_fn(net, train_loader, loss_fn, epoch, optimizer, device):
     global total_size
     global training_loss
 
+    total_size = 0.0
+    training_loss = 0.0
+
     net.fine_tune()
     train_pbar = tqdm(train_loader)
     train_pbar.set_description(f"Epoch {epoch + 1}")
@@ -227,6 +230,9 @@ def evaluate_fn(net, val_loader, device):
     global mae_loss
     global val_total_size
 
+    mae_loss = 0.0
+    val_total_size = 0.0
+
     with torch.no_grad():
         for batch_idx, data in enumerate(val_loader):
             val_total_size += len(data[1])
@@ -247,6 +253,9 @@ def test_fn(net, test_loader, device):
     net.train(False)
     global test_mae_loss
     global test_total_size
+
+    test_mae_loss = 0.0
+    test_total_size = 0.0
 
     with torch.no_grad():
         for batch_idx, data in enumerate(test_loader):
@@ -279,7 +288,7 @@ def map_fn(index, flags):
 
     mymodel = BAA_New(32, *get_My_resnet50()).to(device)
 
-    # Dataloaders (assumes datasets are defined globally or passed in)
+    # Dataloaders
     train_loader = DataLoader(train_set, batch_size=flags['batch_size'],
                               shuffle=True, num_workers=flags['num_workers'], drop_last=True)
     val_loader = DataLoader(val_set, batch_size=flags['batch_size'],
@@ -289,13 +298,14 @@ def map_fn(index, flags):
 
     net = mymodel.train()
     best_loss = float('inf')
-
     loss_fn = nn.L1Loss(reduction='sum')
     optimizer = torch.optim.Adam(mymodel.parameters(), lr=flags['lr'], weight_decay=0)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     # Training Loop
     for epoch in range(flags['num_epochs']):
+        # Reset epoch metrics
+        global training_loss, total_size, mae_loss, val_total_size, test_mae_loss, test_total_size
         training_loss = 0.0
         total_size = 0.0
         mae_loss = 0.0
@@ -304,22 +314,30 @@ def map_fn(index, flags):
         test_total_size = 0.0
 
         start_time = time.time()
-        train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
 
+        train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
         evaluate_fn(net, val_loader, device)
         test_fn(net, test_loader, device)
 
         scheduler.step()
         torch.save(net.state_dict(), os.path.join(path, f'{model_name}.bin'))
 
+        # Compute metrics
         train_loss = training_loss / total_size
         val_mae = mae_loss / val_total_size
         test_mae = test_mae_loss / test_total_size
+        epoch_time = time.time() - start_time
+        lr = optimizer.param_groups[0]["lr"]
 
-        print(f'Test size: {test_total_size}')
-        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, '
-              f'time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
+        # Logging
+        print(f"\n📊 Epoch {epoch + 1} Summary:")
+        print(f"   🔹 Train Loss:     {train_loss:.4f}")
+        print(f"   🔹 Val MAE:        {val_mae:.4f}")
+        print(f"   🔹 Test MAE:       {test_mae:.4f}")
+        print(f"   ⏱️  Duration:       {epoch_time:.2f} sec")
+        print(f"   🚀 Learning Rate:  {lr:.6f}\n")
 
+        # Save best
         if best_loss >= test_mae:
             best_loss = test_mae
             shutil.copy(f'{path}/{model_name}.bin', f'{path}/best_{model_name}.bin')
