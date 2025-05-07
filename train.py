@@ -625,13 +625,28 @@ if __name__ == "__main__":
     flags['num_epochs'] = args.num_epochs
     flags['seed'] = args.seed
 
-    train_df = pd.read_csv(f'/content/drive/My Drive/BAA/train.csv')
-    val_df = pd.read_csv(f'/content/drive/My Drive/BAA/Validation Dataset.csv')
-    test_df = pd.read_excel('/content/drive/My Drive/BAA/Bone age ground truth.xlsx')
+    train_df = pd.read_csv('/content/drive/My Drive/BAA/train.csv')
+
+    val_df = pd.read_csv('/content/drive/My Drive/BAA/Validation Dataset.csv')
+    val_df = val_df.rename(columns={
+        'Image ID': 'id',
+        'Bone Age (months)': 'boneage'
+    })
+
+    test_df = val_df.copy()  # fallback test set
+
     boneage_mean = train_df['boneage'].mean()
     boneage_div = train_df['boneage'].std()
-    train_set, val_set, test_set = create_data_loader(train_df, val_df, test_df, '/content/drive/My Drive/BAA/boneage-training-dataset', '/content/drive/My Drive/BAA/boneage-validation-dataset', '/content/drive/My Drive/BAA/Test Set Images')
+
+    train_set, val_set, test_set = create_data_loader(
+        train_df, val_df, test_df,
+        '/content/drive/My Drive/BAA/boneage-training-dataset',
+        '/content/drive/My Drive/BAA/boneage-validation-dataset',
+        '/content/drive/My Drive/BAA/boneage-validation-dataset'  # reusing validation images
+    )
+
     torch.set_default_tensor_type('torch.FloatTensor')
+
     if args.model_type == 'ensemble':
         xmp.spawn(map_ensemble_fn, args=(flags,), nprocs=8, start_method='fork')
     else:
