@@ -70,7 +70,7 @@ def sample_normalize(image, **kwargs):
     return (image - mean) / (std + 1e-3)
 
 transform_train = Compose([
-    RandomResizedCrop(height=512, width=512, scale=(0.5, 1.0), ratio=(0.75, 1.333), p=0.5),
+    RandomResizedCrop(size=(512, 512), scale=(0.5, 1.0), ratio=(0.75, 1.333), p=0.5),
     ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=20, border_mode=cv2.BORDER_CONSTANT, value=0.0, p=0.8),
     HorizontalFlip(p=0.5),
     RandomBrightnessContrast(p=0.8, contrast_limit=(-0.3, 0.2)),
