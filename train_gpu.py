@@ -134,7 +134,7 @@ class BAATrainDataset(Dataset):
         row = self.df.iloc[index]
         num = int(row['id'])
         image = transform_train(image=read_image(f"{self.file_path}/{num}.png"))['image']
-        print("Image shape:", image.shape)  # Expect: torch.Size([3, 512, 512])
+        #print("Image shape:", image.shape)  # Expect: torch.Size([3, 512, 512])
         return (image, Tensor([row['male']])), row['zscore']
 
     def __len__(self):
