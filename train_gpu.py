@@ -113,7 +113,7 @@ class BAATrainDataset(Dataset):
     def __getitem__(self, index):
         row = self.df.iloc[index]
         num = int(row['id'])
-        image = transform_train(image=read_image(f"{self.file_path}/{num // 1000}/{num}.png"))['image']
+        image = transform_train(image=read_image(f"{self.file_path}/{num}.png"))['image']
         return (image, Tensor([row['male']])), row['zscore']
 
     def __len__(self):
@@ -132,7 +132,7 @@ class BAAValDataset(Dataset):
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
-        image = transform_val(image=read_image(f"{self.file_path}/{int(row['id'])}.png"))['image']
+        image = transform_val(image=read_image(f"{self.file_path}/{num}.png"))['image']
         return (image, Tensor([row['male']])), row['boneage']
 
     def __len__(self):
@@ -150,7 +150,7 @@ class BAATestDataset(Dataset):
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
-        image = transform_test(image=read_image(f"{self.file_path}/{int(row['id'])}.png"))['image']
+        image = transform_test(image=read_image(f"{self.file_path}/{num}.png"))['image']
         return (image, Tensor([row['male']])), row['boneage']
 
     def __len__(self):
