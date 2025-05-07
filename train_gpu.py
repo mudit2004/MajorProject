@@ -142,6 +142,7 @@ class BAATestDataset(Dataset):
     def __init__(self, df, file_path):
         def preprocess_df(df):
             #print("DEBUG: DataFrame columns:", df.columns)
+            print("Test CSV columns:", test_df.columns)
             df['boneage'] = df['Ground truth bone age (months)'].astype('float32')
             df['id'] = df['Case ID'].astype('int32')
             return df
