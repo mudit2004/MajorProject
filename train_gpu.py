@@ -464,7 +464,7 @@ if __name__ == "__main__":
     boneage_mean = train_df['boneage'].mean()
     boneage_div = train_df['boneage'].std()
 
-    # Visual check of sample images
+    """ # Visual check of sample images
     import matplotlib.pyplot as plt
     from IPython.display import display
 
@@ -478,7 +478,7 @@ if __name__ == "__main__":
         plt.title(f"Bone Age: {label:.2f}, Gender: {'Male' if gender_tensor.item() == 1 else 'Female'}")
         plt.axis('off')
         display(plt.gcf())  # Show in Colab
-        plt.close()
+        plt.close() """
     
     train_set, val_set, test_set = create_data_loader(
         train_df,
