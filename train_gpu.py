@@ -76,18 +76,21 @@ transform_train = Compose([
     HorizontalFlip(p=0.5),
     RandomBrightnessContrast(p=0.8, contrast_limit=(-0.3, 0.2)),
     Lambda(image=sample_normalize),
-    CoarseDropout(p=0.5),  # ✅ this acts like Random Erasing
-    ToTensorV2()
+    ToTensorV2(),
+    Lambda(image=lambda x: x.to(torch.float32)),  # ✅ Ensures image is float32
+    Lambda(image=randomErase)
 ])
 
 transform_val = Compose([
     Lambda(image=sample_normalize),
     ToTensorV2(),
+    Lambda(image=lambda x: x.to(torch.float32))  # ✅ Ensures image is float32
 ])
 
 transform_test = Compose([
     Lambda(image=sample_normalize),
     ToTensorV2(),
+    Lambda(image=lambda x: x.to(torch.float32))  # ✅ Ensures image is float32
 ])
 
 def read_image(path, image_size=512):
