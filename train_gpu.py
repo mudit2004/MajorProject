@@ -415,6 +415,9 @@ if __name__ == "__main__":
     val_df = filter_existing_images(val_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
     test_df = filter_existing_images(test_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
     
+    boneage_mean = train_df['boneage'].mean()
+    boneage_div = train_df['boneage'].std()
+
     # Visual check of sample images
     import matplotlib.pyplot as plt
 
@@ -428,9 +431,6 @@ if __name__ == "__main__":
         plt.axis('off')
         plt.show()
     
-    boneage_mean = train_df['boneage'].mean()
-    boneage_div = train_df['boneage'].std()
-
     train_set, val_set, test_set = create_data_loader(
         train_df,
         val_df,
