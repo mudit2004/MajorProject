@@ -52,7 +52,7 @@ from albumentations import (
     Lambda,
     Compose
 )
-from albumentations.pytorch import ToTensor
+from albumentations.pytorch import ToTensorV2
 
 import albumentations
 
@@ -111,19 +111,19 @@ transform_train = Compose([
     HorizontalFlip(p = 0.5),
     RandomBrightnessContrast(p = 0.8, contrast_limit=(-0.3, 0.2)),                             
     Lambda(image = sample_normalize),
-    ToTensor(),
+    ToTensorV2(),
     Lambda(image = randomErase) 
     
 ])
 
 transform_val = Compose([                                   
     Lambda(image = sample_normalize),
-    ToTensor(),
+    ToTensorV2(),
 ])
 
 transform_test = Compose([                                   
     Lambda(image = sample_normalize),
-    ToTensor(),
+    ToTensorV2(),
 ])
 
 
