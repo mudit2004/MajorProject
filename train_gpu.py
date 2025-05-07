@@ -141,14 +141,11 @@ class BAAValDataset(Dataset):
 class BAATestDataset(Dataset):
     def __init__(self, df, file_path):
         def preprocess_df(df):
-            #print("DEBUG: DataFrame columns:", df.columns)
-            print("Test CSV columns:", test_df.columns)
-            df['boneage'] = df['Ground truth bone age (months)'].astype('float32')
-            df['id'] = df['Case ID'].astype('int32')
+            df['boneage'] = df['boneage'].astype('float32')
+            df['id'] = df['Image ID'].astype('int32')
             return df
 
         self.df = preprocess_df(df)
-        print(self.df.head())
         self.file_path = file_path
 
     def __getitem__(self, index):
