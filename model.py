@@ -1,109 +1,38 @@
-import numpy as np 
-import pandas as pd 
-import os, sys, random
 import numpy as np
 import pandas as pd
+import os, sys, random
 import cv2
 import shutil
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from torch import Tensor
-
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import _utils
-
 from random import choice
-
 from skimage import io
 from PIL import Image, ImageOps
-
 import glob
-
-#from torchsummary import summary
 import logging
-
 import matplotlib.pyplot as plt
-
-import torch.nn.functional as F
-from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
 import torchvision.models as models
-# from tqdm.notebook import tqdm
 from tqdm import tqdm
 from sklearn.utils import shuffle
-# from apex import amp
-
-import random
-
 import time
-
 from torch.optim.lr_scheduler import StepLR
 from torch.nn.parameter import Parameter
-
 from albumentations.augmentations.geometric.transforms import ShiftScaleRotate, HorizontalFlip
 from albumentations.augmentations.crops.transforms import RandomResizedCrop
 from albumentations.augmentations.transforms import RandomBrightnessContrast, Normalize
 from albumentations import Lambda
 from albumentations.pytorch import ToTensorV2
 from albumentations import Compose, OneOrOther
-
-'''
-import torch_xla
-import torch_xla.debug.metrics as met
-import torch_xla.distributed.data_parallel as dp
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.utils.utils as xu
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.test.test_utils as test_utils
-'''
-
 import warnings
-warnings.filterwarnings("ignore")
 from pretrainedmodels import se_resnext101_32x4d, se_resnet152, xception, inceptionv4, inceptionresnetv2
 from torchvision.models import resnet34, resnet50
-def get_My_resnet34():
-    model = resnet34(pretrained = True)
-    output_channels = model.fc.in_features
-    model = list(model.children())[:-2]
-    return model, output_channels
+warnings.filterwarnings("ignore")
 
-def get_My_resnet50():
-    model = resnet50(pretrained = True)
-    output_channels = model.fc.in_features
-    model = list(model.children())[:-2]
-    return model, output_channels
-
-def get_My_se_resnet152():
-    model = se_resnet152(pretrained = None)
-    output_channels = model.last_linear.in_features
-    model = nn.Sequential(*list(model.children())[:-2])
-    return model, output_channels
-
-def get_My_se_resnext101_32x4d():
-    model = se_resnext101_32x4d()
-    output_channels = model.last_linear.in_features
-    model = nn.Sequential(*list(model.children())[:-2])
-    return model, output_channels
-
-def get_My_inceptionv4():
-    model = inceptionv4()
-    output_channels = model.last_linear.in_features
-    model = list(model.children())[:-2]
-    
-    model = nn.Sequential(*model)
-    return model, output_channels
-
-def get_My_inceptionresnetv2():
-    model = inceptionresnetv2()
-    output_channels = model.last_linear.in_features
-    model = list(model.children())[:-2]
-    
-    model = nn.Sequential(*model)
-    return model, output_channels
 
 def get_My_resnet34():
     model = resnet34(pretrained = True)
@@ -133,7 +62,6 @@ def get_My_inceptionv4():
     model = inceptionv4()
     output_channels = model.last_linear.in_features
     model = list(model.children())[:-2]
-    
     model = nn.Sequential(*model)
     return model, output_channels
 
@@ -141,6 +69,8 @@ def get_My_inceptionresnetv2():
     model = inceptionresnetv2()
     output_channels = model.last_linear.in_features
     model = list(model.children())[:-2]
+    model = nn.Sequential(*model)
+    return model, output_channels
 
 class Pooling_attention(nn.Module):
   def __init__(self, input_channels, kernel_size = 1):
@@ -151,9 +81,6 @@ class Pooling_attention(nn.Module):
     )
   def forward(self, x):
     return self.pooling_attention(x) 
-
-
-
 
 class Part_Relation(nn.Module):
   def __init__(self, input_channels, reduction = [16], level = 1):
@@ -176,15 +103,13 @@ class Part_Relation(nn.Module):
         nn.Conv2d(3, 1, kernel_size = 1),
         nn.Sigmoid()
     )
+    
   def forward(self, x):
     input = x
     x = self.pooling_attention_0(x)
     x = torch.cat([self.pooling_attention_1(x), self.pooling_attention_3(x), self.pooling_attention_5(x)], dim = 1)
     x = self.last_conv(x)
     return input - input*x
-    
-    model = nn.Sequential(*model)
-    return model, output_channels
 
 class BAA_New(nn.Module):
     def __init__(self, gender_encode_length, backbone, out_channels):
@@ -204,11 +129,6 @@ class BAA_New(nn.Module):
         # self.part_relation1 = Part_Relation(512, 32)
         # self.part_relation2 = Part_Relation(1024, 8, 2)
         # self.part_relation3 = Part_Relation(2048, 8, 2)
-
-        
-        
-        
-        
 
         self.gender_encoder = nn.Linear(1, gender_encode_length)
         self.gender_bn = nn.BatchNorm1d(gender_encode_length)
@@ -273,10 +193,6 @@ class BAA_Base(nn.Module):
         # self.part_relation2 = Part_Relation(1024, 8, 2)
         # self.part_relation3 = Part_Relation(2048, 8, 2)
 
-        
-        
-        
-        
 
         self.gender_encoder = nn.Linear(1, gender_encode_length)
         self.gender_bn = nn.BatchNorm1d(gender_encode_length)
@@ -383,7 +299,7 @@ class Graph_BAA(nn.Module):
         node_feature = feature_map.view(-1, 2048, 16*16)
         A = self.adj_learning(node_feature)
         x = F.leaky_relu(self.gconv(node_feature, A))
-        x = torch.squeeze(F.adaptive_avg_pool1d(x, 1))
+        x = F.adaptive_avg_pool1d(x, 1).squeeze(-1)
         graph_feature = x
         x = torch.cat([x, gender], dim = 1)
 
@@ -421,13 +337,8 @@ class Ensemble(nn.Module):
 
 
     def forward(self, image, gender):
-        image_feature,  graph_feature, gender, result = self.model(image, gender)
-        # image_feature = self.image_encoder(image_feature)
-        if self.training:
-            return (self.fc(torch.cat([image_feature, graph_feature, gender], dim = 1)) + result[0])/2
-        else:
-            return (self.fc(torch.cat([image_feature, graph_feature, gender], dim = 1)) + result[0])/2
-
+        image_feature, graph_feature, gender, result = self.model(image, gender)
+        return (self.fc(torch.cat([image_feature, graph_feature, gender], dim=1)) + result[0]) / 2
         
     def fine_tune(self, need_fine_tune = True):
         self.train(need_fine_tune)

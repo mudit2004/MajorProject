@@ -438,27 +438,24 @@ if __name__ == "__main__":
         'seed': args.seed
     }
 
-    train_df = pd.read_csv('/content/drive/My Drive/BAA/train.csv')
-    val_df = pd.read_csv('/content/drive/My Drive/BAA/Validation Dataset.csv')
-    val_df = val_df.rename(columns={
-        'Image ID': 'id',
-        'Bone Age (months)': 'boneage'
-    })
-    test_df = val_df.copy()  # fallback test set
+    train_df = pd.read_csv('/content/drive/My Drive/Dataset/mini_dataset/train.csv')
+    val_df = pd.read_csv('/content/drive/My Drive/Dataset/mini_dataset/validation.csv')
+    test_df = val_df.copy()  # Reusing val set as test set (no separate .xlsx in mini_dataset)
 
     boneage_mean = train_df['boneage'].mean()
     boneage_div = train_df['boneage'].std()
 
     train_set, val_set, test_set = create_data_loader(
-        train_df, val_df, test_df,
-        '/content/drive/My Drive/BAA/boneage-training-dataset',
-        '/content/drive/My Drive/BAA/boneage-validation-dataset',
-        '/content/drive/My Drive/BAA/boneage-validation-dataset'  # reused for test
+        train_df,
+        val_df,
+        test_df,
+        '/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset',
+        '/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset',
+        '/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset'  # reuse for test
     )
 
     torch.set_default_tensor_type('torch.FloatTensor')
-
     if args.model_type == 'ensemble':
-        map_ensemble_fn(0, flags)
+        xmp.spawn(map_ensemble_fn, args=(flags,), nprocs=8, start_method='fork')
     else:
-        map_fn(0, flags)
+        xmp.spawn(map_fn, args=(flags,), nprocs=8, start_method='fork')
