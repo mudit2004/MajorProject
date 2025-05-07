@@ -365,8 +365,8 @@ if __name__ == "__main__":
     from model import Ensemble, Graph_BAA, BAA_New, get_My_resnet50, BAA_Base
     import argparse
 
-    import os
-    print(os.path.exists("/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset/7216.png"))
+    # import os
+    # print(os.path.exists("/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset/7216.png"))
     
     parser = argparse.ArgumentParser()
     parser.add_argument('model_type')
@@ -396,11 +396,19 @@ if __name__ == "__main__":
     val_df = pd.read_csv('/content/drive/My Drive/Dataset/mini_dataset/validation.csv')
     test_df = val_df.copy()  # Reusing val set as test set
 
-    def filter_existing_images(df, img_dir):
+    def filter_existing_images(df, img_dir, name=""):
+        id_col = 'id' if 'id' in df.columns else 'Image ID'
+        
         def img_exists(row):
-            img_path = os.path.join(img_dir, f"{int(row['id'])}.png")
+            img_path = os.path.join(img_dir, f"{int(row[id_col])}.png")
             return os.path.exists(img_path)
-        return df[df.apply(img_exists, axis=1)]
+
+        original_len = len(df)
+        df = df[df.apply(img_exists, axis=1)]
+        filtered_len = len(df)
+        
+        print(f"[{name}] Filtered out {original_len - filtered_len} rows (remaining: {filtered_len})")
+        return df
 
     # Apply filtering
     train_df = filter_existing_images(train_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset")
