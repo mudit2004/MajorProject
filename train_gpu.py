@@ -9,6 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
 from torch import Tensor
+from torchvision.transforms import RandomErasing
 
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.dataloader import _utils
@@ -51,8 +52,11 @@ warnings.filterwarnings("ignore")
 # ✅ This script will now run on CPU/GPU
 
 class ToFloat32(ImageOnlyTransform):
-    def apply(self, img, **params):
-        return img.astype('float32')
+    def __init__(self, always_apply=True, p=1.0):
+        super(ToFloat32, self).__init__(always_apply, p)
+
+    def apply(self, image, **params):
+        return image.astype('float32')
 
 def seed_everything(seed=1234):
     random.seed(seed)
@@ -64,10 +68,17 @@ def seed_everything(seed=1234):
 norm_mean = [0.143]
 norm_std = [0.144]
 
-RandomErasing = transforms.RandomErasing(scale=(0.02, 0.08), ratio=(0.5, 2), p=0.8)
+random_eraser = RandomErasing(p=1)
 
 def randomErase(image, **kwargs):
-    return RandomErasing(image)
+    # Convert NumPy to Tensor (C, H, W)
+    image_tensor = torch.tensor(image).permute(2, 0, 1).float()
+    
+    # Apply RandomErasing
+    erased = random_eraser(image_tensor)
+    
+    # Convert back to NumPy (H, W, C)
+    return erased.permute(1, 2, 0).numpy()
 
 def sample_normalize(image, **kwargs):
     image = image / 255
@@ -77,25 +88,25 @@ def sample_normalize(image, **kwargs):
 
 transform_train = Compose([
     RandomResizedCrop(size=(512, 512), scale=(0.5, 1.0), ratio=(0.75, 1.333), p=0.5),
-    ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=20, border_mode=cv2.BORDER_CONSTANT, value=0.0, p=0.8),
+    ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=20,border_mode=cv2.BORDER_CONSTANT, value=0.0, p=0.8),
     HorizontalFlip(p=0.5),
     RandomBrightnessContrast(p=0.8, contrast_limit=(-0.3, 0.2)),
-    Lambda(image=sample_normalize),
-    ToTensorV2(),
-    Lambda(image=lambda x: x.to(torch.float32)),  # ✅ Ensures image is float32
-    Lambda(image=randomErase)
+    ToFloat32(),                       # 👈 ensure float32 before normalize
+    Lambda(image=sample_normalize),   # 👈 your custom normalize
+    Lambda(image=randomErase),        # 👈 apply random erase
+    ToTensorV2()                      # 👈 convert to tensor (final step)
 ])
 
 transform_val = Compose([
+    ToFloat32(),
     Lambda(image=sample_normalize),
-    ToTensorV2(),
-    ToFloat32()
+    ToTensorV2()
 ])
 
 transform_test = Compose([
+    ToFloat32(),
     Lambda(image=sample_normalize),
-    ToTensorV2(),
-    ToFloat32()
+    ToTensorV2()
 ])
 
 def read_image(path, image_size=512):
