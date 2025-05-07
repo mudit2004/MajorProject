@@ -243,90 +243,58 @@ def reduce_fn(vals):
     return sum(vals)
 
 def map_fn(index, flags):
-    ## Setup
+    # Setup
     root = '/content/drive/My Drive/BAA'
     model_name = 'rsa50_4.48'
     path = f'{root}/{model_name}'
 
-    if not os.path.exists(path):
-        os.mkdir(path)
-
+    os.makedirs(path, exist_ok=True)
     seed_everything(seed=flags['seed'])
 
-    # Set device to GPU or CPU
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    mymodel = BAA_New(32, *get_My_resnet50())
-    mymodel = mymodel.to(device)
+    mymodel = BAA_New(32, *get_My_resnet50()).to(device)
 
-    # Use regular shuffling for GPU
-    train_loader = torch.utils.data.DataLoader(
-        train_set,
-        batch_size=flags['batch_size'],
-        shuffle=True,
-        num_workers=flags['num_workers'],
-        drop_last=True)
+    # Dataloaders (assumes datasets are defined globally or passed in)
+    train_loader = DataLoader(train_set, batch_size=flags['batch_size'],
+                              shuffle=True, num_workers=flags['num_workers'], drop_last=True)
+    val_loader = DataLoader(val_set, batch_size=flags['batch_size'],
+                            shuffle=False, num_workers=flags['num_workers'])
+    test_loader = DataLoader(test_set, batch_size=flags['batch_size'],
+                             shuffle=False, num_workers=flags['num_workers'])
 
-    val_loader = torch.utils.data.DataLoader(
-        val_set,
-        batch_size=flags['batch_size'],
-        shuffle=False,
-        num_workers=flags['num_workers'])
-
-    test_loader = torch.utils.data.DataLoader(
-        test_set,
-        batch_size=flags['batch_size'],
-        shuffle=False,
-        num_workers=flags['num_workers'])
-
-    ## Network, optimizer, and loss function creation
     net = mymodel.train()
-
-    global best_loss
     best_loss = float('inf')
 
     loss_fn = nn.L1Loss(reduction='sum')
-    lr = flags['lr']
-    wd = 0
-
-    optimizer = torch.optim.Adam(mymodel.parameters(), lr=lr, weight_decay=wd)
+    optimizer = torch.optim.Adam(mymodel.parameters(), lr=flags['lr'], weight_decay=0)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
-    ## Training Loop
+    # Training Loop
     for epoch in range(flags['num_epochs']):
-        global training_loss
         training_loss = 0.0
-        global total_size
         total_size = 0.0
-
-        global mae_loss
         mae_loss = 0.0
-        global val_total_size
         val_total_size = 0.0
-
-        global test_mae_loss
         test_mae_loss = 0.0
-        global test_total_size
         test_total_size = 0.0
 
         start_time = time.time()
         train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
 
-        # Evaluation
         evaluate_fn(net, val_loader, device)
         test_fn(net, test_loader, device)
 
         scheduler.step()
-
-        # Save model
         torch.save(net.state_dict(), os.path.join(path, f'{model_name}.bin'))
 
         train_loss = training_loss / total_size
         val_mae = mae_loss / val_total_size
         test_mae = test_mae_loss / test_total_size
 
-        print(test_total_size)
-        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
+        print(f'Test size: {test_total_size}')
+        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, '
+              f'time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
 
         if best_loss >= test_mae:
             best_loss = test_mae
@@ -336,74 +304,58 @@ def map_ensemble_fn(index, flags):
     root = '/content/drive/My Drive/BAA'
     model_name = 'final_ensemble_3.88'
     path = f'{root}/{model_name}'
-
-    if not os.path.exists(path):
-        os.mkdir(path)
+    os.makedirs(path, exist_ok=True)
 
     seed_everything(seed=flags['seed'])
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    net = Ensemble(new_model)
-    net = net.to(device)
+    # Make sure new_model is defined properly
+    base_model = BAA_New(32, *get_My_resnet50()).to(device)
+    new_model = Graph_BAA(base_model).to(device)
+    net = Ensemble(new_model).to(device)
 
-    train_loader = torch.utils.data.DataLoader(
-        train_set,
-        batch_size=flags['batch_size'],
-        shuffle=True,
-        num_workers=flags['num_workers'],
-        drop_last=True)
-
-    val_loader = torch.utils.data.DataLoader(
-        val_set,
-        batch_size=flags['batch_size'],
-        shuffle=False,
-        num_workers=flags['num_workers'])
-
-    test_loader = torch.utils.data.DataLoader(
-        test_set,
-        batch_size=flags['batch_size'],
-        shuffle=False,
-        num_workers=flags['num_workers'])
+    # DataLoaders
+    train_loader = DataLoader(train_set, batch_size=flags['batch_size'], shuffle=True,
+                              num_workers=flags['num_workers'], drop_last=True)
+    val_loader = DataLoader(val_set, batch_size=flags['batch_size'], shuffle=False,
+                            num_workers=flags['num_workers'])
+    test_loader = DataLoader(test_set, batch_size=flags['batch_size'], shuffle=False,
+                             num_workers=flags['num_workers'])
 
     net.fine_tune()
-    global best_loss
     best_loss = float('inf')
-    loss_fn = nn.L1Loss(reduction='sum')
-    lr = flags['lr']
-    wd = 0
 
-    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()), lr=lr, weight_decay=wd)
+    loss_fn = nn.L1Loss(reduction='sum')
+    optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, net.parameters()),
+                                 lr=flags['lr'], weight_decay=0)
     scheduler = StepLR(optimizer, step_size=10, gamma=0.5)
 
     for epoch in range(flags['num_epochs']):
-        global training_loss
         training_loss = 0.0
-        global total_size
         total_size = 0.0
-        global mae_loss
         mae_loss = 0.0
-        global val_total_size
         val_total_size = 0.0
-        global test_mae_loss
         test_mae_loss = 0.0
-        global test_total_size
         test_total_size = 0.0
 
         start_time = time.time()
+
         train_fn(net, train_loader, loss_fn, epoch, optimizer, device)
         evaluate_fn(net, val_loader, device)
         test_fn(net, test_loader, device)
 
         scheduler.step()
+
         torch.save(net.state_dict(), os.path.join(path, f'{model_name}.bin'))
 
         train_loss = training_loss / total_size
         val_mae = mae_loss / val_total_size
         test_mae = test_mae_loss / test_total_size
 
-        print(test_total_size)
-        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
+        print(f'Test size: {test_total_size}')
+        print(f'training loss: {train_loss}, val loss: {val_mae}, test loss: {test_mae}, '
+              f'time: {time.time() - start_time}, lr: {optimizer.param_groups[0]["lr"]}')
 
         if best_loss >= test_mae:
             best_loss = test_mae
@@ -455,6 +407,6 @@ if __name__ == "__main__":
 
     torch.set_default_tensor_type('torch.FloatTensor')
     if args.model_type == 'ensemble':
-        xmp.spawn(map_ensemble_fn, args=(flags,), nprocs=8, start_method='fork')
+        map_ensemble_fn(0, flags)
     else:
-        xmp.spawn(map_fn, args=(flags,), nprocs=8, start_method='fork')
+        map_fn(0, flags)
