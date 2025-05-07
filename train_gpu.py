@@ -206,7 +206,8 @@ def train_fn(net, train_loader, loss_fn, epoch, optimizer, device):
         batch_size = len(data[1])
 
         optimizer.zero_grad()
-        y_pred = net(image, gender).squeeze()
+        y_pred, _ = net(image, gender)  # if your model returns (prediction, something_else)
+        y_pred = y_pred.squeeze()
 
         loss = loss_fn(y_pred, label)
         total_loss = loss + L1_penalty(net, 1e-5)
@@ -232,8 +233,8 @@ def evaluate_fn(net, val_loader, device):
             image, gender = image.to(device), gender.to(device)
             label = data[1].to(device)
 
-            y_pred = net(image, gender) * boneage_div + boneage_mean
-            y_pred = y_pred.squeeze()
+            y_pred, _ = net(image, gender)
+            y_pred = (y_pred * boneage_div + boneage_mean).squeeze()
 
             batch_loss = F.l1_loss(y_pred, label, reduction='sum').item()
             mae_loss += batch_loss
@@ -252,8 +253,8 @@ def test_fn(net, test_loader, device):
             image, gender = image.to(device), gender.to(device)
             label = data[1].to(device)
 
-            y_pred = net(image, gender) * boneage_div + boneage_mean
-            y_pred = y_pred.squeeze()
+            y_pred, _ = net(image, gender)
+            y_pred = (y_pred * boneage_div + boneage_mean).squeeze()
 
             batch_loss = F.l1_loss(y_pred, label, reduction='sum').item()
             test_mae_loss += batch_loss
