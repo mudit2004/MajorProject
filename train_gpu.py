@@ -142,35 +142,39 @@ class BAATrainDataset(Dataset):
 
 class BAAValDataset(Dataset):
     def __init__(self, df, file_path):
-        def preprocess_df(df):
-            df['id'] = df['Image ID'].astype('int32')  # convert and standardize to 'id'
-            df['male'] = df['male'].astype('float32')
-            df['boneage'] = df['boneage'].astype('float32')  # fix typo: bonage -> boneage
-            return df
-
-        self.df = preprocess_df(df)
+        self.df = self.preprocess_df(df)
         self.file_path = file_path
+
+    def preprocess_df(self, df):
+        df['id'] = df['Image ID'].astype('int32')
+        df['male'] = df['male'].map({'TRUE': 1.0, 'FALSE': 0.0})
+        df['boneage'] = df['boneage'].astype('float32')
+        return df
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
+        num = int(row['id'])
         image = transform_val(image=read_image(f"{self.file_path}/{num}.png"))['image']
         return (image, Tensor([row['male']])), row['boneage']
 
     def __len__(self):
         return len(self.df)
 
+
 class BAATestDataset(Dataset):
     def __init__(self, df, file_path):
-        def preprocess_df(df):
-            df['boneage'] = df['boneage'].astype('float32')
-            df['id'] = df['Image ID'].astype('int32')
-            return df
-
-        self.df = preprocess_df(df)
+        self.df = self.preprocess_df(df)
         self.file_path = file_path
+
+    def preprocess_df(self, df):
+        df['id'] = df['Image ID'].astype('int32')
+        df['male'] = df['male'].map({'TRUE': 1.0, 'FALSE': 0.0})
+        df['boneage'] = df['boneage'].astype('float32')
+        return df
 
     def __getitem__(self, index):
         row = self.df.iloc[index]
+        num = int(row['id'])
         image = transform_test(image=read_image(f"{self.file_path}/{num}.png"))['image']
         return (image, Tensor([row['male']])), row['boneage']
 
