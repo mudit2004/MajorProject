@@ -122,8 +122,9 @@ class BAATrainDataset(Dataset):
 class BAAValDataset(Dataset):
     def __init__(self, df, file_path):
         def preprocess_df(df):
+            df['id'] = df['Image ID'].astype('int32')  # convert and standardize to 'id'
             df['male'] = df['male'].astype('float32')
-            df['bonage'] = df['boneage'].astype('float32')
+            df['boneage'] = df['boneage'].astype('float32')  # fix typo: bonage -> boneage
             return df
 
         self.df = preprocess_df(df)
@@ -140,8 +141,7 @@ class BAAValDataset(Dataset):
 class BAATestDataset(Dataset):
     def __init__(self, df, file_path):
         def preprocess_df(df):
-            print("DEBUG: DataFrame columns:", df.columns)
-            df['male'] = (df['Sex'] == 'M').astype('float32')
+            #print("DEBUG: DataFrame columns:", df.columns)
             df['boneage'] = df['Ground truth bone age (months)'].astype('float32')
             df['id'] = df['Case ID'].astype('int32')
             return df
