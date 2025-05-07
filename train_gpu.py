@@ -41,6 +41,7 @@ from albumentations import (
     Compose
 )
 from albumentations.pytorch import ToTensorV2
+from albumentations.augmentations.dropout import CoarseDropout
 from albumentations.augmentations.crops.transforms import RandomResizedCrop
 
 warnings.filterwarnings("ignore")
@@ -75,7 +76,7 @@ transform_train = Compose([
     HorizontalFlip(p=0.5),
     RandomBrightnessContrast(p=0.8, contrast_limit=(-0.3, 0.2)),
     Lambda(image=sample_normalize),
-    Lambda(image=randomErase),       # ✅ Move this BEFORE ToTensorV2
+    CoarseDropout(p=0.5),  # ✅ this acts like Random Erasing
     ToTensorV2()
 ])
 
