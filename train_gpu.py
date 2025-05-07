@@ -365,6 +365,9 @@ if __name__ == "__main__":
     from model import Ensemble, Graph_BAA, BAA_New, get_My_resnet50, BAA_Base
     import argparse
 
+    import os
+    print(os.path.exists("/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset/7216.png"))
+    
     parser = argparse.ArgumentParser()
     parser.add_argument('model_type')
     parser.add_argument('lr', type=float)
