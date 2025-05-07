@@ -43,9 +43,16 @@ import time
 from torch.optim.lr_scheduler import StepLR
 from torch.nn.parameter import Parameter
 
-from albumentations.augmentations.transforms import Lambda, ShiftScaleRotate, HorizontalFlip, Normalize, RandomBrightnessContrast, RandomResizedCrop
+from albumentations import (
+    ShiftScaleRotate,
+    HorizontalFlip,
+    Normalize,
+    RandomBrightnessContrast,
+    RandomResizedCrop,
+    Lambda,
+    Compose
+)
 from albumentations.pytorch import ToTensor
-from albumentations import Compose, OneOrOther
 
 import albumentations
 
