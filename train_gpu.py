@@ -394,8 +394,19 @@ if __name__ == "__main__":
 
     train_df = pd.read_csv('/content/drive/My Drive/Dataset/mini_dataset/train.csv')
     val_df = pd.read_csv('/content/drive/My Drive/Dataset/mini_dataset/validation.csv')
-    test_df = val_df.copy()  # Reusing val set as test set (no separate .xlsx in mini_dataset)
+    test_df = val_df.copy()  # Reusing val set as test set
 
+    def filter_existing_images(df, img_dir):
+        def img_exists(row):
+            img_path = os.path.join(img_dir, f"{int(row['id'])}.png")
+            return os.path.exists(img_path)
+        return df[df.apply(img_exists, axis=1)]
+
+    # Apply filtering
+    train_df = filter_existing_images(train_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-training-dataset")
+    val_df = filter_existing_images(val_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
+    test_df = filter_existing_images(test_df, "/content/drive/My Drive/Dataset/mini_dataset/boneage-validation-dataset")
+    
     boneage_mean = train_df['boneage'].mean()
     boneage_div = train_df['boneage'].std()
 
