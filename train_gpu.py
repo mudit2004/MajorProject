@@ -186,8 +186,9 @@ def create_data_loader(train_df, val_df, test_df, train_root, val_root, test_roo
     
 def L1_penalty(net, alpha):
     loss = 0
-    for param in net.fc.parameters():
-        loss += torch.sum(torch.abs(param))
+    for layer in [net.fc0, net.fc1, net.output]:  # Include the fully connected layers
+        for param in layer.parameters():
+            loss += torch.sum(torch.abs(param))
     return alpha * loss
 
 def train_fn(net, train_loader, loss_fn, epoch, optimizer, device):
