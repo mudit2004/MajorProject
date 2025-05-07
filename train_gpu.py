@@ -43,11 +43,16 @@ from albumentations import (
 from albumentations.pytorch import ToTensorV2
 from albumentations.augmentations.dropout import CoarseDropout
 from albumentations.augmentations.crops.transforms import RandomResizedCrop
+from albumentations.core.transforms_interface import ImageOnlyTransform
 
 warnings.filterwarnings("ignore")
 
 # 🧠 No torch_xla, xm, xmp, pl — cleaned for GPU
 # ✅ This script will now run on CPU/GPU
+
+class ToFloat32(ImageOnlyTransform):
+    def apply(self, img, **params):
+        return img.astype('float32')
 
 def seed_everything(seed=1234):
     random.seed(seed)
@@ -84,13 +89,13 @@ transform_train = Compose([
 transform_val = Compose([
     Lambda(image=sample_normalize),
     ToTensorV2(),
-    Lambda(image=lambda x: x.to(torch.float32))  # ✅ Ensures image is float32
+    ToFloat32()
 ])
 
 transform_test = Compose([
     Lambda(image=sample_normalize),
     ToTensorV2(),
-    Lambda(image=lambda x: x.to(torch.float32))  # ✅ Ensures image is float32
+    ToFloat32()
 ])
 
 def read_image(path, image_size=512):
