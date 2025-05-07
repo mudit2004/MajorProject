@@ -140,6 +140,7 @@ class BAAValDataset(Dataset):
 class BAATestDataset(Dataset):
     def __init__(self, df, file_path):
         def preprocess_df(df):
+            print("DEBUG: DataFrame columns:", df.columns)
             df['male'] = (df['Sex'] == 'M').astype('float32')
             df['boneage'] = df['Ground truth bone age (months)'].astype('float32')
             df['id'] = df['Case ID'].astype('int32')
